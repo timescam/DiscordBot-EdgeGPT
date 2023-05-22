@@ -1,6 +1,7 @@
 import discord
 import re
 import os
+import json
 import asyncio
 from EdgeGPT import Chatbot, ConversationStyle
 from config import load_config
@@ -18,9 +19,12 @@ try:
 except:
     MENTION_CHANNEL_ID = None
 logger = log.setup_logger(__name__)
-chatbot = Chatbot(cookie_path="./cookies.json")
 sem = asyncio.Semaphore(1)
 conversation_style = "balanced"
+
+with open("./cookies.json", encoding="utf-8") as file:
+    cookies = json.load(file)
+chatbot = Chatbot(cookies=cookies)
 
 # To add suggest responses
 class MyView(discord.ui.View):
@@ -93,6 +97,9 @@ class DropdownView(discord.ui.View):
 async def set_conversation_style(style: str):
     global conversation_style
     conversation_style = style
+async def set_chatbot(cookies):
+    global chatbot
+    chatbot = Chatbot(cookies=cookies)
 
 async def send_message(chatbot: Chatbot, message, user_message: str):
     async with sem:
@@ -107,11 +114,11 @@ async def send_message(chatbot: Chatbot, message, user_message: str):
         try:
              # Change conversation style
             if conversation_style == "creative":
-                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.creative, wss_link="wss://sydney.bing.com/sydney/ChatHub")
+                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.creative)
             elif conversation_style == "precise":
-                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.precise, wss_link="wss://sydney.bing.com/sydney/ChatHub")
+                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.precise)
             else:
-                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.balanced, wss_link="wss://sydney.bing.com/sydney/ChatHub")
+                reply = await chatbot.ask(prompt=user_message, conversation_style=ConversationStyle.balanced)
             # Get reply text
             try:
                 text = f"{reply['item']['messages'][4]['text']}"
@@ -208,18 +215,19 @@ class Event(Cog_Extension):
     async def on_message(self, message: discord.Message):
         if message.author == self.bot.user:
             return
-        if self.bot.user in message.mentions and (not MENTION_CHANNEL_ID or message.channel.id == MENTION_CHANNEL_ID):
-            content = re.sub(r'<@.*?>', '', message.content).strip()
-            if len(content) > 0:
-                username = str(message.author)
-                channel = str(message.channel)
-                logger.info(f"\x1b[31m{username}\x1b[0m : '{content}' ({channel}) [Style: {conversation_style}]")
-                task = asyncio.create_task(send_message(chatbot, message, content))
-                await asyncio.gather(task)
-            else:
-                await message.channel.send(view=DropdownView())
-        elif MENTION_CHANNEL_ID is not None:
-            await message.channel.send(f"> **Can only be mentioned at <#{self.bot.get_channel(MENTION_CHANNEL_ID).id}>**")
+        if self.bot.user in message.mentions:
+            if not MENTION_CHANNEL_ID or message.channel.id == MENTION_CHANNEL_ID:
+                content = re.sub(r'<@.*?>', '', message.content).strip()
+                if len(content) > 0:
+                    username = str(message.author)
+                    channel = str(message.channel)
+                    logger.info(f"\x1b[31m{username}\x1b[0m : '{content}' ({channel}) [Style: {conversation_style}]")
+                    task = asyncio.create_task(send_message(chatbot, message, content))
+                    await asyncio.gather(task)
+                else:
+                    await message.channel.send(view=DropdownView())
+            elif MENTION_CHANNEL_ID is not None:
+                await message.channel.send(f"> **Can only be mentioned at <#{self.bot.get_channel(MENTION_CHANNEL_ID).id}>**")
 
 async def setup(bot):
     await bot.add_cog(Event(bot))
