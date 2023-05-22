@@ -1,5 +1,5 @@
 version: "1"
 rules:
-  - base: main
+  - base: railway
     upstream: FuseFairy:main    # change `wei` to the owner of upstream repo
     mergeMethod: merge
