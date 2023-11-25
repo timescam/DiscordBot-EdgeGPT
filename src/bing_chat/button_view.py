@@ -15,7 +15,7 @@ class ButtonView(discord.ui.View):
             button = discord.ui.Button(label=label)
             # Button event
             async def callback(interaction: discord.Interaction, button: discord.ui.Button):     
-                if  self.button_author != None and interaction.user.id != self.button_author:
+                if  interaction.user.id != self.button_author:
                     await interaction.response.defer(ephemeral=True, thinking=True)
                     await interaction.followup.send("You don't have permission to press this button.")
                 else:

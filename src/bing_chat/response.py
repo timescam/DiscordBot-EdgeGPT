@@ -3,7 +3,7 @@ import re
 from re_edge_gpt import Chatbot
 from re_edge_gpt import ConversationStyle
 from src import log
-from src.button_view import ButtonView
+from src.bing_chat.button_view import ButtonView
 
 logger = log.setup_logger(__name__)
 
