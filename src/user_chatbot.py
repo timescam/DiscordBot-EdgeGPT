@@ -44,17 +44,21 @@ class UserChatbot():
     
     def get_conversation_style(self) -> str:
         return self.conversation_style
-    
-    async def set_chatbot(self, cookies):
-        self.chatbot = Chatbot(cookie=cookies)
 
-    async def send_message(self, interaction: discord.Interaction, message):
-        async with self.sem_send_message:
-            await send_message(self.chatbot, interaction, message, self.conversation_style, users_chatbot, self.user_id)
+    async def send_message(self, interaction: discord.Interaction, message: str, image: str=None):
+        if not self.sem_send_message.locked():
+            async with self.sem_send_message:
+                await send_message(self.chatbot, interaction, message, image, self.conversation_style, users_chatbot, self.user_id)
+        else:
+            await interaction.response.send_message("> **ERROE: Please wait for the previous command to complete.**", ephemeral=True)
 
     async def create_image(self, interaction: discord.Interaction, prompt: str):
-        async with self.sem_create_image:
-            await create_image(interaction, users_chatbot, prompt, self.auth_cookie)
+        if not self.sem_create_image.locked():
+            async with self.sem_create_image:
+                await create_image(interaction, users_chatbot, prompt, self.auth_cookie)
+        else:
+            await interaction.response.send_message("> **ERROE: Please wait for the previous command to complete.**", ephemeral=True)
+
     
     async def reset_conversation(self):
         await self.chatbot.reset()

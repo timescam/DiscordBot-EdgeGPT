@@ -101,7 +101,7 @@ async def set_chatbot(cookies):
     global chatbot
     chatbot = Chatbot(cookies=cookies)
 
-async def send_message(interaction, user_message: str):
+async def send_message(interaction, user_message: str, image: str=None):
     async with sem:
         reply = ''
         text = ''
@@ -125,7 +125,8 @@ async def send_message(interaction, user_message: str):
             reply = await chatbot.ask(
                 prompt=user_message,
                 conversation_style=conversation_style,
-                simplify_response=True
+                simplify_response=True,
+                attachment={"image_url":f"{image}"}
             )
 
             # Get reply text
@@ -133,23 +134,15 @@ async def send_message(interaction, user_message: str):
             text = re.sub(r'\[\^(\d+)\^\]', lambda match: '', text)
             
             # Get the URL, if available
-            try:
-                if reply['sources_text']:
-                    urls = re.findall(r'\[(\d+)\. (.*?)\]\((https?://.*?)\)', reply["sources_text"])
-                    for url in urls:
-                        all_url.append(f"{url[0]}. [{url[1]}]({url[2]})")
+            urls = re.findall(r'\[(\d+)\. (.*?)\]\((https?://.*?)\)', reply["sources_link"])
+            if len(urls) > 0:
+                for url in urls:
+                    all_url.append(f"{url[0]}. [{url[1]}]({url[2]})")
                 link_text = "\n".join(all_url)
                 link_embed = discord.Embed(description=link_text)
-            except:
-                pass
             
             # Set the final message
-            user_message = user_message.replace("\n", "")
-            if isinstance(interaction, discord.Interaction):
-                ask = f"> **{user_message}** - <@{str(interaction.user.id)}> (***style: {conversation_style_str}***)\n\n"
-            elif isinstance(interaction, discord.message.Message):
-                ask = f"> **{user_message}**\t(***style: {conversation_style_str}***)\n\n"
-            response = f"{ask}{text}"
+            response = f"{text} (***style: {conversation_style_str}***)"
             
             # Discord limit about 2000 characters for a message
             while len(response) > 2000:
@@ -190,8 +183,16 @@ class Event(Cog_Extension):
                 if len(content) > 0:
                     username = str(message.author)
                     channel = str(message.channel)
-                    logger.info(f"\x1b[31m{username}\x1b[0m : '{content}' ({channel}) [Style: {conversation_style_str}]")
-                    await send_message(message, content)
+                    if message.attachments:
+                        for attachment in message.attachments:
+                            if "image" in attachment.content_type:
+                                logger.info(f"\x1b[31m{username}\x1b[0m : '{content}' ({channel}) [Style: {conversation_style_str}]")
+                                await send_message(message, content, attachment.url)
+                            else:
+                                await message.channel.send("> **ERROE: This file format is not supported.**")
+                    else:
+                        logger.info(f"\x1b[31m{username}\x1b[0m : '{content}' ({channel}) [Style: {conversation_style_str}]")
+                        await send_message(message, content)
                 else:
                     await message.channel.send(view=DropdownView())
             elif MENTION_CHANNEL_ID is not None:

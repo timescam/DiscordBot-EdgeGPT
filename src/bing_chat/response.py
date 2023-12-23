@@ -7,14 +7,14 @@ from src.bing_chat.button_view import ButtonView
 
 logger = log.setup_logger(__name__)
 
-async def send_message(chatbot: Chatbot, interaction: discord.Interaction, user_message: str, conversation_style_str: str, users_chatbot=None, user_id=None):
+async def send_message(chatbot: Chatbot, interaction: discord.Interaction, user_message: str, image: str, conversation_style_str: str, users_chatbot=None, user_id=None):
     reply = ''
     text = ''
     link_embed = ''
     all_url = []
     
     if not interaction.response.is_done():
-        await interaction.response.defer(ephemeral=False, thinking=True)
+        await interaction.response.defer(thinking=True)
 
     try:
         # Change conversation style
@@ -28,7 +28,8 @@ async def send_message(chatbot: Chatbot, interaction: discord.Interaction, user_
         reply = await chatbot.ask(
             prompt=user_message,
             conversation_style=conversation_style,
-            simplify_response=True
+            simplify_response=True,
+            attachment={"image_url":f"{image}"}
         )
 
         # Get reply text
@@ -36,15 +37,12 @@ async def send_message(chatbot: Chatbot, interaction: discord.Interaction, user_
         text = re.sub(r'\[\^(\d+)\^\]', lambda match: '', text)
         
         # Get the URL, if available
-        try:
-            if reply['sources_text']:
-                urls = re.findall(r'\[(\d+)\. (.*?)\]\((https?://.*?)\)', reply["sources_text"])
-                for url in urls:
-                    all_url.append(f"{url[0]}. [{url[1]}]({url[2]})")
+        urls = re.findall(r'\[(\d+)\. (.*?)\]\((https?://.*?)\)', reply["sources_link"])
+        if len(urls) > 0:
+            for url in urls:
+                all_url.append(f"{url[0]}. [{url[1]}]({url[2]})")
             link_text = "\n".join(all_url)
             link_embed = discord.Embed(description=link_text)
-        except:
-            pass
         
         # Set the final message
         user_message = user_message.replace("\n", "")
@@ -57,12 +55,11 @@ async def send_message(chatbot: Chatbot, interaction: discord.Interaction, user_
             response = response[2000:]
             await interaction.followup.send(temp)
             
-        suggest_responses = reply["suggestions"]              
+        suggest_responses = reply["suggestions"]         
         if link_embed:
-            await interaction.followup.send(response, view=ButtonView(interaction, conversation_style_str, suggest_responses, users_chatbot, user_id), embed=link_embed, wait=True)
+            await interaction.followup.send(response, view=ButtonView(interaction, conversation_style_str, suggest_responses, users_chatbot, user_id), embed=link_embed)
         else:
-            await interaction.followup.send(response, view=ButtonView(interaction, conversation_style_str, suggest_responses, users_chatbot, user_id), wait=True)
+            await interaction.followup.send(response, view=ButtonView(interaction, conversation_style_str, suggest_responses, users_chatbot, user_id))
 
     except Exception as e:
-            await interaction.followup.send(f">>> **Error: {e}**")
-            logger.error(f"Error while sending message: {e}")
+        await interaction.followup.send(f"> **ERROR: {e}**")
